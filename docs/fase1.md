@@ -144,3 +144,179 @@ Este módulo cumple con los siguientes requerimientos del proyecto:
 - Preparación de datos para almacenamiento seguro  
 
 ---
+
+# 🔑 Módulo de Autenticación y API — Persona C
+
+## 📌 Descripción general
+
+En esta fase se implementó el módulo de autenticación y la capa de API del sistema, encargado de gestionar el registro de usuarios, el inicio de sesión y la exposición de endpoints para el consumo de datos.
+
+Este módulo integra los componentes desarrollados por:
+
+- Persona A → persistencia y base de datos  
+- Persona B → criptografía (generación y protección de llaves)  
+
+El objetivo principal es proporcionar una interfaz segura y funcional para la interacción con el sistema.
+
+---
+
+## 🔐 Hashing de contraseñas
+
+Se implementó el manejo seguro de contraseñas utilizando el algoritmo bcrypt mediante la librería `passlib`.
+
+Funciones implementadas:
+
+```python
+hash_password(password)
+verify_password(plain_password, hashed_password)
+```
+
+### Características:
+
+- Las contraseñas nunca se almacenan en texto plano  
+- Se utiliza hashing con salt automático  
+- Comparación segura de contraseñas durante el login  
+
+---
+
+## 🎟️ Generación y verificación de JWT
+
+Se implementó autenticación basada en JSON Web Tokens (JWT) para manejar sesiones de usuario.
+
+Funciones implementadas:
+
+```python
+create_access_token(data)
+verify_token(token)
+```
+
+### Características:
+
+- Tokens firmados con HMAC-SHA256  
+- Inclusión de campo de expiración (`exp`)  
+- Validación de firma e integridad del token  
+
+---
+
+## 👤 Endpoint de registro
+
+Se implementó el endpoint:
+
+```python
+POST /auth/register
+```
+
+### Proceso:
+
+1. Validación de datos de entrada  
+2. Verificación de que el email no exista  
+3. Hashing de la contraseña  
+4. Generación del par de llaves  
+5. Cifrado de la llave privada  
+6. Almacenamiento del usuario  
+
+### Resultado:
+
+```python
+{
+  "message": "Usuario registrado exitosamente",
+  "user_id": "...",
+  "email": "...",
+  "display_name": "..."
+}
+```
+
+---
+
+## 🔑 Endpoint de login
+
+Se implementó el endpoint:
+
+```python
+POST /auth/login
+```
+
+### Proceso:
+
+1. Búsqueda del usuario por email  
+2. Verificación de contraseña  
+3. Generación de token JWT  
+
+### Resultado:
+
+```python
+{
+  "access_token": "...",
+  "token_type": "bearer"
+}
+```
+
+---
+
+## 🔓 Endpoint de llave pública
+
+Se implementó el endpoint:
+
+```python
+GET /users/{id}/key
+```
+
+### Proceso:
+
+1. Búsqueda del usuario  
+2. Obtención de la llave pública  
+
+### Resultado:
+
+```python
+{
+  "user_id": "...",
+  "email": "...",
+  "public_key": "-----BEGIN PUBLIC KEY-----..."
+}
+```
+
+---
+
+## 🧪 Pruebas unitarias
+
+Se implementaron pruebas en:
+
+- tests/test_auth.py  
+- tests/test_users.py  
+
+### Validaciones realizadas:
+
+- Hashing de contraseñas  
+- Verificación de contraseñas  
+- Creación y validación de JWT  
+- Estructura de respuesta de llave pública  
+
+### Resultado:
+
+Tests ejecutados correctamente.
+
+---
+
+## 🧩 Integración del sistema
+
+La aplicación se estructuró de forma modular:
+
+- src/main.py → aplicación principal  
+- main.py → punto de entrada  
+- routes/ → endpoints  
+- schemas/ → validación  
+- core/ → seguridad  
+
+Se utilizó FastAPI como framework principal.
+
+---
+
+## ✅ Cumplimiento de requisitos
+
+Este módulo cumple con:
+
+- Registro con hashing seguro  
+- Login con JWT  
+- Endpoint de llave pública  
+- Integración con criptografía  
