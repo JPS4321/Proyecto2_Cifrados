@@ -1,0 +1,5 @@
+Nombre base de datos:
+proyecto2
+
+Contraseña:
+1234
