@@ -164,9 +164,29 @@ def decrypt_private_key(encrypted_private_key_json: str, password: str) -> str:
 # =========================
 def generate_and_protect_keypair(password: str) -> Tuple[str, str]:
     """
-    Genera el par de llaves y devuelve:
-    - public_key_pem
-    - encrypted_private_key_json
+    Genera un par de llaves RSA-2048 y protege la llave privada usando
+    una clave derivada de la contraseña del usuario mediante PBKDF2
+    y cifrado AES-256-GCM.
+
+    USO (para el endpoint de registro):
+        public_key, encrypted_private_key = generate_and_protect_keypair(password)
+
+    RETORNA:
+        - public_key (str): Llave pública en formato PEM
+        - encrypted_private_key (str): JSON serializado con:
+            {
+              "kdf": "PBKDF2-HMAC-SHA256",
+              "iterations": ...,
+              "salt": "...",
+              "nonce": "...",
+              "ciphertext": "..."
+            }
+
+    IMPORTANTE:
+        - `public_key` se guarda en la columna `public_key`
+        - `encrypted_private_key` se guarda directamente como TEXT en la DB
+        - El tag de autenticación de AES-GCM está incluido dentro de `ciphertext`
+
     """
     private_key_pem, public_key_pem = generate_rsa_keypair()
     encrypted_private_key_json = encrypt_private_key(private_key_pem, password)
