@@ -536,6 +536,61 @@ Cumplido.
 Se ejecutaron pruebas unitarias del módulo, superando el mínimo requerido.
 
 
+## 👥 Mensajería grupal
+
+Se implementó soporte para envío de mensajes cifrados a múltiples destinatarios utilizando cifrado híbrido.
+
+### 🔐 Proceso
+
+1. Se genera una clave AES-256 efímera
+2. El mensaje se cifra con AES-256-GCM
+3. La clave AES se cifra individualmente con la llave pública RSA de cada destinatario
+4. Se almacena:
+   - Un único mensaje cifrado
+   - Una clave cifrada por cada usuario en `message_keys`
+
+### 📡 Endpoint
+
+POST /messages/group
+
+### 📥 Request
+
+```json
+{
+  "sender_id": "uuid",
+  "group_id": "uuid",
+  "recipient_ids": ["uuid1", "uuid2"],
+  "plaintext": "Mensaje secreto"
+}
+```
+
+### 📤 Response
+
+```json
+{
+  "id": "uuid",
+  "sender_id": "uuid",
+  "recipient_id": null,
+  "group_id": "uuid",
+  "ciphertext": "...",
+  "nonce": "...",
+  "auth_tag": "...",
+  "encrypted_keys_count": 2,
+  "created_at": "timestamp"
+}
+```
+
+### ✅ Validaciones
+Se requiere al menos un destinatario
+Todos los destinatarios deben existir
+Se genera un nonce único por mensaje
+
+## 🔒 Seguridad
+AES-256-GCM garantiza confidencialidad e integridad
+RSA-OAEP protege la clave AES por usuario
+No se comparte directamente la clave entre usuarios
+
+
 ## 🧱 Archivos principales modificados o creados
 
 ### Criptografía
