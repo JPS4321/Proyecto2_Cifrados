@@ -2,7 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.crypto.crypto_utils import decrypt_private_key
-from src.crypto.message_crypto import encrypt_message_for_recipient, decrypt_message_for_recipient
+from src.crypto.message_crypto import (
+    encrypt_message_for_recipient,
+    decrypt_message_for_recipient,
+    encrypt_message_for_group,
+)
 from src.crud.message_crud import (
     create_message,
     create_message_key,
@@ -18,6 +22,8 @@ from src.schemas.message import (
     MessageWithKeyResponse,
     MessageDecryptRequest,
     MessageDecryptResponse,
+    GroupMessageCreate,
+    GroupMessageResponse,
 )
 
 router = APIRouter(prefix="/messages", tags=["messages"])
@@ -149,4 +155,71 @@ def decrypt_message(
     return MessageDecryptResponse(
         message_id=str(message.id),
         plaintext=plaintext,
+    )
+
+@router.post("/group", response_model=GroupMessageResponse, status_code=status.HTTP_201_CREATED)
+def send_group_message(payload: GroupMessageCreate, db: Session = Depends(get_db)):
+    sender = get_user_by_id(db, payload.sender_id)
+    if not sender:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Remitente no encontrado",
+        )
+
+    if not payload.recipient_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Debe incluir al menos un destinatario",
+        )
+
+    recipients_public_keys = {}
+
+    for recipient_id in payload.recipient_ids:
+        recipient = get_user_by_id(db, recipient_id)
+        if not recipient:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Destinatario no encontrado: {recipient_id}",
+            )
+
+        recipients_public_keys[recipient_id] = recipient.public_key
+
+    encrypted_payload = encrypt_message_for_group(
+        plaintext=payload.plaintext,
+        recipients_public_keys=recipients_public_keys,
+    )
+
+    message = create_message(
+        db,
+        {
+            "sender_id": payload.sender_id,
+            "recipient_id": None,
+            "group_id": payload.group_id,
+            "ciphertext": encrypted_payload["ciphertext"],
+            "nonce": encrypted_payload["nonce"],
+            "auth_tag": encrypted_payload["auth_tag"],
+        },
+    )
+
+    encrypted_keys_count = 0
+
+    for key_data in encrypted_payload["encrypted_keys"]:
+        create_message_key(
+            db,
+            message_id=message.id,
+            user_id=key_data["user_id"],
+            encrypted_key=key_data["encrypted_key"],
+        )
+        encrypted_keys_count += 1
+
+    return GroupMessageResponse(
+        id=str(message.id),
+        sender_id=str(message.sender_id),
+        recipient_id=None,
+        group_id=str(message.group_id),
+        ciphertext=message.ciphertext,
+        nonce=message.nonce,
+        auth_tag=message.auth_tag,
+        encrypted_keys_count=encrypted_keys_count,
+        created_at=message.created_at,
     )
