@@ -32,3 +32,22 @@ class MessageDecryptRequest(BaseModel):
 class MessageDecryptResponse(BaseModel):
     message_id: str
     plaintext: str
+
+
+class GroupMessageCreate(BaseModel):
+    sender_id: str
+    group_id: str
+    recipient_ids: list[str]
+    plaintext: str
+
+
+class GroupMessageResponse(BaseModel):
+    id: str
+    sender_id: str
+    recipient_id: str | None
+    group_id: str
+    ciphertext: str
+    nonce: str
+    auth_tag: str
+    encrypted_keys_count: int
+    created_at: datetime
