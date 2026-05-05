@@ -22,3 +22,13 @@ class MessageResponse(BaseModel):
 
 class MessageWithKeyResponse(MessageResponse):
     encrypted_key: str
+
+
+class MessageDecryptRequest(BaseModel):
+    user_id: str
+    password: str
+
+
+class MessageDecryptResponse(BaseModel):
+    message_id: str
+    plaintext: str
