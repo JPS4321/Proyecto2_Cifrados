@@ -3,8 +3,7 @@ from sqlalchemy.orm import Session
 from src.models.message import Message
 from src.models.message_key import MessageKey
 
-
-# Crear mensaje
+#Crear nuevo mensaje cifrado
 def create_message(db: Session, message_data: dict):
     message = Message(**message_data)
     db.add(message)
@@ -12,8 +11,7 @@ def create_message(db: Session, message_data: dict):
     db.refresh(message)
     return message
 
-
-# Crear clave cifrada para usuario
+#Almacena la clave simétrica del mensaje cifrada para un usuario específico.
 def create_message_key(db: Session, message_id, user_id, encrypted_key):
     key = MessageKey(
         message_id=message_id,
@@ -25,12 +23,12 @@ def create_message_key(db: Session, message_id, user_id, encrypted_key):
     return key
 
 
-# Obtener mensaje
+#Obtiene un mensaje por su ID.
 def get_message_by_id(db: Session, message_id):
     return db.query(Message).filter(Message.id == message_id).first()
 
 
-# Obtener clave de un usuario para un mensaje
+#Obtiene la clave cifrada para un mensaje y usuario específicos.
 def get_message_key_for_user(db: Session, message_id, user_id):
     return db.query(MessageKey).filter(
         MessageKey.message_id == message_id,
@@ -38,7 +36,7 @@ def get_message_key_for_user(db: Session, message_id, user_id):
     ).first()
 
 
-# Obtener mensajes de un usuario
+#  Obtiene todos los mensajes accesibles por un usuario.
 def get_messages_for_user(db: Session, user_id):
     return (
         db.query(Message, MessageKey)

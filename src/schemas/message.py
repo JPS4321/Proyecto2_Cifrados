@@ -17,7 +17,7 @@ class MessageResponse(BaseModel):
     ciphertext: str
     nonce: str
     auth_tag: str
-    created_at: datetime
+    created_at: datetime    
 
 
 class MessageWithKeyResponse(MessageResponse):
