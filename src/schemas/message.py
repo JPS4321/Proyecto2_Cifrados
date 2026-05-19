@@ -7,6 +7,7 @@ class MessageCreate(BaseModel):
     sender_id: UUID
     recipient_id: UUID
     plaintext: str
+    sender_password: str
 
 
 class MessageResponse(BaseModel):
@@ -17,7 +18,10 @@ class MessageResponse(BaseModel):
     ciphertext: str
     nonce: str
     auth_tag: str
-    created_at: datetime    
+    signature: str | None = None
+    signature_valid: bool | None = None
+    message_hash: str | None = None
+    created_at: datetime
 
 
 class MessageWithKeyResponse(MessageResponse):
@@ -32,6 +36,15 @@ class MessageDecryptRequest(BaseModel):
 class MessageDecryptResponse(BaseModel):
     message_id: str
     plaintext: str
+    signature_valid: bool | None = None
+    warning: str | None = None
+
+
+class MessageVerifyResponse(BaseModel):
+    message_id: str
+    message_hash: str | None
+    signature_valid: bool
+    warning: str | None = None
 
 
 class GroupMessageCreate(BaseModel):
@@ -39,6 +52,7 @@ class GroupMessageCreate(BaseModel):
     group_id: str
     recipient_ids: list[str]
     plaintext: str
+    sender_password: str
 
 
 class GroupMessageResponse(BaseModel):
@@ -49,5 +63,8 @@ class GroupMessageResponse(BaseModel):
     ciphertext: str
     nonce: str
     auth_tag: str
+    signature: str | None = None
+    signature_valid: bool | None = None
+    message_hash: str | None = None
     encrypted_keys_count: int
     created_at: datetime
