@@ -13,19 +13,56 @@ CREATE TABLE IF NOT EXISTS usuarios (
 
 CREATE TABLE IF NOT EXISTS messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
     sender_id UUID NOT NULL REFERENCES usuarios(id),
+
     recipient_id UUID REFERENCES usuarios(id),
+
     group_id UUID,
+
     ciphertext TEXT NOT NULL,
+
     nonce VARCHAR(255) NOT NULL,
+
     auth_tag VARCHAR(255) NOT NULL,
+
+    signature TEXT,
+
+    signature_valid BOOLEAN,
+
+    message_hash VARCHAR(64),
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS message_keys (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
     message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+
     user_id UUID NOT NULL REFERENCES usuarios(id),
+
     encrypted_key TEXT NOT NULL,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS blockchain (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    index INTEGER NOT NULL UNIQUE,
+
+    timestamp TIMESTAMP NOT NULL,
+
+    sender_id UUID,
+
+    recipient_id UUID,
+
+    message_hash VARCHAR(64) NOT NULL,
+
+    previous_hash VARCHAR(64) NOT NULL,
+
+    nonce INTEGER NOT NULL,
+
+    hash VARCHAR(64) NOT NULL
 );

@@ -44,3 +44,43 @@ def get_messages_for_user(db: Session, user_id):
         .filter(MessageKey.user_id == user_id)
         .all()
     )
+
+def save_message_signature(
+    db: Session,
+    message_id,
+    signature,
+    message_hash
+):
+    message = db.query(Message).filter(
+        Message.id == message_id
+    ).first()
+
+    if not message:
+        return None
+
+    message.signature = signature
+    message.message_hash = message_hash
+
+    db.commit()
+    db.refresh(message)
+
+    return message
+
+def update_message_signature_status(
+    db: Session,
+    message_id,
+    signature_valid
+):
+    message = db.query(Message).filter(
+        Message.id == message_id
+    ).first()
+
+    if not message:
+        return None
+
+    message.signature_valid = signature_valid
+
+    db.commit()
+    db.refresh(message)
+
+    return message
