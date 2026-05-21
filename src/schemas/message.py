@@ -40,9 +40,13 @@ class MessageDecryptResponse(BaseModel):
     warning: str | None = None
 
 
+class MessageVerifyRequest(BaseModel):
+    user_id: str
+    password: str
+
+
 class MessageVerifyResponse(BaseModel):
     message_id: str
-    message_hash: str | None
     signature_valid: bool
     warning: str | None = None
 

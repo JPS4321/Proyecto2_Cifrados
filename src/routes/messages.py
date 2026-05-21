@@ -36,6 +36,7 @@ from src.schemas.message import (
     MessageWithKeyResponse,
     MessageDecryptRequest,
     MessageDecryptResponse,
+    MessageVerifyRequest,
     MessageVerifyResponse,
     GroupMessageCreate,
     GroupMessageResponse,
@@ -288,13 +289,24 @@ def decrypt_message(
     )
 
 
-@router.get("/{message_id}/verify", response_model=MessageVerifyResponse)
-def verify_message(message_id: str, db: Session = Depends(get_db)):
+@router.post("/{message_id}/verify", response_model=MessageVerifyResponse)
+def verify_message(
+    message_id: str,
+    payload: MessageVerifyRequest,
+    db: Session = Depends(get_db),
+):
     message = get_message_by_id(db, message_id)
     if not message:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Mensaje no encontrado",
+        )
+
+    user = get_user_by_id(db, str(payload.user_id))
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado",
         )
 
     sender = get_user_by_id(db, str(message.sender_id))
@@ -304,7 +316,19 @@ def verify_message(message_id: str, db: Session = Depends(get_db)):
             detail="Remitente no encontrado",
         )
 
-    if not message.signature or not message.message_hash:
+    message_key = get_message_key_for_user(
+        db,
+        message_id=message_id,
+        user_id=str(payload.user_id),
+    )
+
+    if not message_key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El usuario no tiene permiso para verificar este mensaje",
+        )
+
+    if not message.signature:
         update_message_signature_status(
             db,
             message_id=message.id,
@@ -313,15 +337,27 @@ def verify_message(message_id: str, db: Session = Depends(get_db)):
 
         return MessageVerifyResponse(
             message_id=str(message.id),
-            message_hash=message.message_hash,
             signature_valid=False,
-            warning="El mensaje no tiene firma o hash registrado.",
+            warning="El mensaje no tiene firma digital registrada.",
         )
 
     try:
-        signature_valid = verify_message_signature(
+        private_key_pem = decrypt_private_key(
+            user.encrypted_private_key,
+            payload.password,
+        )
+
+        plaintext = decrypt_message_for_recipient(
+            ciphertext=message.ciphertext,
+            encrypted_key=message_key.encrypted_key,
+            nonce=message.nonce,
+            auth_tag=message.auth_tag,
+            recipient_private_key_pem=private_key_pem,
+        )
+
+        signature_valid = verify_plaintext_message(
             public_key_pem=sender.public_key,
-            message_hash_hex=message.message_hash,
+            plaintext=plaintext,
             signature_b64=message.signature,
         )
 
@@ -332,7 +368,6 @@ def verify_message(message_id: str, db: Session = Depends(get_db)):
         )
 
     except Exception:
-        signature_valid = False
         update_message_signature_status(
             db,
             message_id=message.id,
@@ -341,14 +376,12 @@ def verify_message(message_id: str, db: Session = Depends(get_db)):
 
         return MessageVerifyResponse(
             message_id=str(message.id),
-            message_hash=message.message_hash,
             signature_valid=False,
-            warning="No se pudo verificar la firma del mensaje.",
+            warning="No se pudo verificar la firma. Verifica la contraseña o los permisos del usuario.",
         )
 
     return MessageVerifyResponse(
         message_id=str(message.id),
-        message_hash=message.message_hash,
         signature_valid=signature_valid,
         warning=None if signature_valid else "Firma inválida: el mensaje no pudo ser verificado.",
     )
