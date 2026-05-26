@@ -1,24 +1,23 @@
+import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = "postgresql://postgres:1234@localhost/proyecto2"
-
-engine = create_engine(
-    DATABASE_URL,
-    echo=False
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:1234@localhost:5432/proyecto2"
 )
 
-# Sesión de base de datos
+engine = create_engine(DATABASE_URL, echo=False)
+
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
     bind=engine
 )
 
-# Base para los modelos
 Base = declarative_base()
 
-# Dependencia para obtener la sesión en FastAPI
 def get_db():
     db = SessionLocal()
     try:
