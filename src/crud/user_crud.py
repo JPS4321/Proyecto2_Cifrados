@@ -83,3 +83,40 @@ def delete_user(db: Session, user_id):
     db.delete(user)
     db.commit()
     return True
+
+def update_user_totp_secret(
+    db: Session,
+    user_id,
+    totp_secret: str
+):
+    user = db.query(User).filter(
+        User.id == user_id
+    ).first()
+
+    if not user:
+        return None
+
+    user.totp_secret = totp_secret
+
+    db.commit()
+    db.refresh(user)
+
+    return user
+
+def clear_user_totp_secret(
+    db: Session,
+    user_id
+):
+    user = db.query(User).filter(
+        User.id == user_id
+    ).first()
+
+    if not user:
+        return None
+
+    user.totp_secret = None
+
+    db.commit()
+    db.refresh(user)
+
+    return user
