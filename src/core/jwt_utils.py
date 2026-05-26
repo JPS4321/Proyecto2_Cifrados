@@ -1,3 +1,5 @@
+# src/core/jwt_utils.py
+
 import base64
 import hashlib
 import hmac
@@ -7,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 SECRET_KEY = "SECRET_KEY"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
+REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 class JWTError(Exception):
     pass
@@ -21,6 +24,7 @@ def _b64url_decode(data: str) -> bytes:
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     header = {"alg": ALGORITHM, "typ": "JWT"}
     payload = data.copy()
+    payload.setdefault("type", "access")
 
     expire = datetime.now(UTC) + (
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -70,5 +74,31 @@ def verify_token(token: str) -> dict:
 
     if int(datetime.now(UTC).timestamp()) > int(exp):
         raise JWTError("Token expirado")
+
+    return payload
+
+def create_refresh_token(data: dict, expires_delta: timedelta | None = None) -> str:
+    payload = data.copy()
+    payload["type"] = "refresh"
+
+    return create_access_token(
+        payload,
+        expires_delta=expires_delta or timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+    )
+
+def verify_access_token(token: str) -> dict:
+    payload = verify_token(token)
+
+    if payload.get("type") != "access":
+        raise JWTError("El token no es de acceso")
+
+    return payload
+
+
+def verify_refresh_token(token: str) -> dict:
+    payload = verify_token(token)
+
+    if payload.get("type") != "refresh":
+        raise JWTError("El token no es de refresco")
 
     return payload
