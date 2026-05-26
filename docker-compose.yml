@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:14
+    container_name: proyecto2_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: proyecto2
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+  api:
+    build: .
+    container_name: proyecto2_api
+    restart: always
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://postgres:1234@db:5432/proyecto2
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:
