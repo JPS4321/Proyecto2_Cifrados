@@ -12,12 +12,10 @@ from src.crypto.message_crypto import (
 )
 from src.crypto.signatures import (
     sign_plaintext_message,
-    verify_message_signature,
     verify_plaintext_message,
 )
 from src.crud.blockchain_crud import (
     get_last_block,
-    count_blocks,
     create_block,
 )
 from src.crud.message_crud import (
@@ -30,6 +28,7 @@ from src.crud.message_crud import (
 )
 from src.crud.user_crud import get_user_by_id
 from src.database import get_db
+from src.dependencies import get_current_user
 from src.schemas.message import (
     MessageCreate,
     MessageResponse,
@@ -48,12 +47,6 @@ router = APIRouter(prefix="/messages", tags=["messages"])
 def _create_block_for_message(db: Session, message):
     """
     Crea automáticamente un bloque para un mensaje firmado.
-
-    Usa:
-    - message_hash del mensaje
-    - sender_id
-    - recipient_id si es mensaje individual
-    - previous_hash del último bloque o '0' * 64 si es génesis
     """
     if not message.message_hash:
         raise ValueError("El mensaje no tiene message_hash para registrar en blockchain.")
@@ -94,13 +87,24 @@ def _create_block_for_message(db: Session, message):
 
 
 @router.post("", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
-def send_message(payload: MessageCreate, db: Session = Depends(get_db)):
-    sender = get_user_by_id(db, payload.sender_id)
-    if not sender:
+def send_message(
+    payload: MessageCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Envía un mensaje cifrado a un destinatario.
+
+    Ruta protegida con JWT.
+    El remitente debe ser el mismo usuario autenticado.
+    """
+    if str(payload.sender_id) != str(current_user.id):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Remitente no encontrado",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No puedes enviar mensajes en nombre de otro usuario.",
         )
+
+    sender = current_user
 
     recipient = get_user_by_id(db, payload.recipient_id)
     if not recipient:
@@ -134,7 +138,7 @@ def send_message(payload: MessageCreate, db: Session = Depends(get_db)):
     message = create_message(
         db,
         {
-            "sender_id": payload.sender_id,
+            "sender_id": sender.id,
             "recipient_id": payload.recipient_id,
             "group_id": None,
             "ciphertext": encrypted_payload["ciphertext"],
@@ -165,7 +169,23 @@ def send_message(payload: MessageCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/{user_id}", response_model=list[MessageWithKeyResponse])
-def get_user_messages(user_id: str, db: Session = Depends(get_db)):
+def get_user_messages(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Obtiene los mensajes de un usuario.
+
+    Ruta protegida con JWT.
+    Un usuario solo puede consultar sus propios mensajes.
+    """
+    if str(user_id) != str(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No puedes consultar mensajes de otro usuario.",
+        )
+
     user = get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(
@@ -202,7 +222,20 @@ def decrypt_message(
     message_id: str,
     payload: MessageDecryptRequest,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
+    """
+    Descifra un mensaje.
+
+    Ruta protegida con JWT.
+    El usuario del payload debe coincidir con el usuario autenticado.
+    """
+    if str(payload.user_id) != str(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No puedes descifrar mensajes de otro usuario.",
+        )
+
     message = get_message_by_id(db, message_id)
     if not message:
         raise HTTPException(
@@ -210,12 +243,7 @@ def decrypt_message(
             detail="Mensaje no encontrado",
         )
 
-    user = get_user_by_id(db, str(payload.user_id))
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuario no encontrado",
-        )
+    user = current_user
 
     sender = get_user_by_id(db, str(message.sender_id))
     if not sender:
@@ -227,7 +255,7 @@ def decrypt_message(
     message_key = get_message_key_for_user(
         db,
         message_id=message_id,
-        user_id=str(payload.user_id),
+        user_id=str(user.id),
     )
 
     if not message_key:
@@ -294,7 +322,20 @@ def verify_message(
     message_id: str,
     payload: MessageVerifyRequest,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
+    """
+    Verifica la firma digital de un mensaje.
+
+    Ruta protegida con JWT.
+    El usuario del payload debe coincidir con el usuario autenticado.
+    """
+    if str(payload.user_id) != str(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No puedes verificar mensajes de otro usuario.",
+        )
+
     message = get_message_by_id(db, message_id)
     if not message:
         raise HTTPException(
@@ -302,12 +343,7 @@ def verify_message(
             detail="Mensaje no encontrado",
         )
 
-    user = get_user_by_id(db, str(payload.user_id))
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuario no encontrado",
-        )
+    user = current_user
 
     sender = get_user_by_id(db, str(message.sender_id))
     if not sender:
@@ -319,7 +355,7 @@ def verify_message(
     message_key = get_message_key_for_user(
         db,
         message_id=message_id,
-        user_id=str(payload.user_id),
+        user_id=str(user.id),
     )
 
     if not message_key:
@@ -388,13 +424,24 @@ def verify_message(
 
 
 @router.post("/group", response_model=GroupMessageResponse, status_code=status.HTTP_201_CREATED)
-def send_group_message(payload: GroupMessageCreate, db: Session = Depends(get_db)):
-    sender = get_user_by_id(db, payload.sender_id)
-    if not sender:
+def send_group_message(
+    payload: GroupMessageCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Envía un mensaje grupal cifrado.
+
+    Ruta protegida con JWT.
+    El remitente debe ser el mismo usuario autenticado.
+    """
+    if str(payload.sender_id) != str(current_user.id):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Remitente no encontrado",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No puedes enviar mensajes grupales en nombre de otro usuario.",
         )
+
+    sender = current_user
 
     if not payload.recipient_ids:
         raise HTTPException(
@@ -439,7 +486,7 @@ def send_group_message(payload: GroupMessageCreate, db: Session = Depends(get_db
     message = create_message(
         db,
         {
-            "sender_id": payload.sender_id,
+            "sender_id": sender.id,
             "recipient_id": None,
             "group_id": payload.group_id,
             "ciphertext": encrypted_payload["ciphertext"],
